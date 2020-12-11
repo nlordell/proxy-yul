@@ -4,10 +4,12 @@
   "author": "Nicholas Rodrigues Lordello <nlordell@gmail.com>",
   "license": "LGPL-3.0+",
   "scripts": {
-    "compile": "node ./scripts/compile.js"
+    "build": "node ./scripts/build.js",
+    "fmt": "prettier -w '**/*.js'"
   },
   "devDependencies": {
     "ethers": "^5.0.24",
+    "prettier": "^2.2.1",
     "solc": "^0.7.5"
   }
 }
