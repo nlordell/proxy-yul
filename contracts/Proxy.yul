@@ -1,7 +1,14 @@
 object "Proxy" {
     code {
         datacopy(0, dataoffset("runtime"), add(datasize("runtime"), 32))
-        setimmutable("implementation", mload(datasize("runtime")))
+
+        let implementation := mload(datasize("runtime"))
+        setimmutable("implementation", implementation)
+        sstore(
+            0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc,
+            implementation
+        )
+
         return(0, datasize("runtime"))
     }
 
