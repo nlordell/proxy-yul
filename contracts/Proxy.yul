@@ -25,13 +25,12 @@ object "Proxy" {
             )
 
             returndatacopy(0, 0, returndatasize())
-            switch success
-                case 0 {
-                    revert(0, returndatasize())
-                }
-                default {
-                    return(0, returndatasize())
-                }
+
+            if iszero(success) {
+                revert(0, returndatasize())
+            }
+
+            return(0, returndatasize())
         }
     }
 }
