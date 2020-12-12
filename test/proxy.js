@@ -5,7 +5,8 @@ const { abi, bytecode, deployedBytecode } = require("../build/Proxy.json");
 const { Test } = require("./contracts");
 
 describe("Proxy", () => {
-  const provider = new ethers.providers.JsonRpcProvider();
+  const url = process.env.JSON_RPC_URL || "http://localhost:8545";
+  const provider = new ethers.providers.JsonRpcProvider(url);
   const signer = provider.getSigner();
 
   const Proxy = new ethers.ContractFactory(abi, bytecode, signer);

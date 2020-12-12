@@ -10,16 +10,18 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    container: node:lts
 
-    strategy:
-      matrix:
-        node-version: [14.x]
+    services:
+      ganache:
+        image: trufflesuite/ganache-cli
+        ports:
+          - 8545:8545
 
     steps:
     - uses: actions/checkout@v2
-    - uses: actions/setup-node@v1
-      with:
-        node-version: ${{ matrix.node-version }}
     - run: yarn
     - run: yarn build
     - run: yarn test
+      env:
+        JSON_RPC_URL: http://ganache:8545
