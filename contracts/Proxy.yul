@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-newer
+
 object "Proxy" {
     code {
         datacopy(0, dataoffset("runtime"), add(datasize("runtime"), 32))
