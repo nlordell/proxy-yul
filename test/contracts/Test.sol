@@ -19,4 +19,15 @@ contract Test {
     {
         return message;
     }
+
+    function resize(bytes memory data, uint256 length)
+        external
+        pure
+        returns (bytes memory)
+    {
+        assembly {
+            mstore(data, length)
+        }
+        return data;
+    }
 }

@@ -45,9 +45,10 @@ describe("Proxy", () => {
 
   describe("runtime", () => {
     let proxy;
+    let test;
 
     beforeEach(async () => {
-      const test = await Test.connect(signer).deploy();
+      test = await Test.connect(signer).deploy();
       const { address: proxyAddress } = await Proxy.deploy(test.address);
 
       proxy = test.attach(proxyAddress);
@@ -76,11 +77,52 @@ describe("Proxy", () => {
         signer
       );
       const { address } = await BadProxy.deploy(
-        ethers.utils.hexConcat(["0x1badc0de2badc0de3badc0de", proxy.address])
+        ethers.utils.hexConcat(["0x1badc0de2badc0de3badc0de", test.address])
       );
-      const badProxy = proxy.attach(address);
+      const badProxy = test.attach(address);
 
       expect(await badProxy.echo("hello")).to.equal("hello");
+    });
+
+    it("should add a predictable amount of gas overhead", async () => {
+      const PROXY_OVERHEAD = 65;
+
+      const gasOverhead = (inLength, outLength) => {
+        const a = Math.ceil(Math.max(inLength, outLength) / 32);
+        return BigNumber.from(
+          700 /* delegatecall */ +
+            (3 + 3 * Math.ceil(inLength / 32)) /* calldatacopy */ +
+            (3 + 3 * Math.ceil(outLength / 32)) /* returndatacopy */ +
+            (3 * a + Math.floor((a * a) / 512)) /* memory cost */ +
+            PROXY_OVERHEAD
+        );
+      };
+
+      for (const [dataLength, newLength] of [
+        [10, 10],
+        [1000, 5],
+        [0, 5000],
+      ]) {
+        const data = ethers.utils.randomBytes(dataLength);
+        const proxyGas = await proxy.estimateGas.resize(data, newLength);
+        const directGas = await test.estimateGas.resize(data, newLength);
+
+        const roundToWord = (n) => Math.ceil(n / 32) * 32;
+        const inLength =
+          4 /* functionSelector */ +
+          32 /* dataOffset */ +
+          32 /* newLength */ +
+          32 /* dataLength */ +
+          roundToWord(dataLength);
+        const outLength =
+          32 /* resultOffset */ +
+          32 /* resultLength */ +
+          roundToWord(newLength);
+
+        expect(proxyGas.sub(directGas)).to.deep.equal(
+          gasOverhead(inLength, outLength)
+        );
+      }
     });
   });
 });
