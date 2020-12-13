@@ -16,23 +16,31 @@ object "Proxy" {
 
     object "runtime" {
         code {
-            calldatacopy(0, 0, calldatasize())
+            // NOTE: Use `RETURNDATASIZE` instead of 0's as it is 1 gas cheaper
+            // and guaranteed to be 0 before the `DELEGATECALL`.
+            calldatacopy(
+                returndatasize(),
+                returndatasize(),
+                calldatasize()
+            )
             let success := delegatecall(
                 gas(),
                 loadimmutable("implementation"),
-                0,
+                returndatasize(),
                 calldatasize(),
-                0,
-                0
+                returndatasize(),
+                returndatasize()
             )
 
             returndatacopy(0, 0, returndatasize())
 
-            if iszero(success) {
-                revert(0, returndatasize())
+            // NOTE: Ideally, we should be able to just `JUMPI` directly on the
+            // `success` value, but using `iszero(success)` for the condition
+            // is generating `ISZERO ISZERO JUMPI` instead of just `JUMPI`.
+            if success {
+                return(0, returndatasize())
             }
-
-            return(0, returndatasize())
+            revert(0, returndatasize())
         }
     }
 }

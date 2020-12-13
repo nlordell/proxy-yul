@@ -85,7 +85,7 @@ describe("Proxy", () => {
     });
 
     it("should add a predictable amount of gas overhead", async () => {
-      const PROXY_OVERHEAD = 65;
+      const PROXY_OVERHEAD = 51;
 
       const gasOverhead = (inLength, outLength) => {
         const a = Math.ceil(Math.max(inLength, outLength) / 32);
