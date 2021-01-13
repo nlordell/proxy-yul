@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0-or-newer
-pragma solidity ^0.7.0;
+pragma solidity ^0.8.0;
 
 contract Test {
     uint256 public value;
