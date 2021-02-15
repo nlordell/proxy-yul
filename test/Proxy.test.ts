@@ -111,5 +111,25 @@ describe("Proxy", () => {
         );
       }
     });
+
+    it("should add the minimal amount of runtime gas overhead", async () => {
+      const testAddress = test.address.replace(/^0x/, "").toLowerCase();
+
+      // NOTE: Deployment code for the minimal proxy contract.
+      // <https://eips.ethereum.org/EIPS/eip-1167>
+      const MIN_PROXY_BYTECODE = `3d602d80600a3d3981f3363d3d373d3d3d363d73${testAddress}5af43d82803e903d91602b57fd5bf3`;
+      const MinProxy = new ContractFactory(
+        ProxyArtifact.abi,
+        MIN_PROXY_BYTECODE,
+        signer
+      );
+      const { address: proxyAddress } = await MinProxy.deploy(test.address);
+      const minProxy = test.attach(proxyAddress);
+
+      const proxyGas = await proxy.estimateGas.echo("hello");
+      const minProxyGas = await minProxy.estimateGas.echo("hello");
+
+      expect(proxyGas).to.deep.equal(minProxyGas);
+    });
   });
 });
