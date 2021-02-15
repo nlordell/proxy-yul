@@ -1,21 +1,22 @@
-const { expect } = require("chai");
-const { ethers, BigNumber } = require("ethers");
+import { expect } from "chai";
+import { ethers, BigNumber, Contract, ContractFactory } from "ethers";
 
-const { abi, bytecode, deployedBytecode } = require("../build/Proxy.json");
-const { Test } = require("./contracts");
+import ProxyArtifact from "../build/Proxy.json";
+import TestArtifact from "../build/Test.json";
 
 describe("Proxy", () => {
   const url = process.env.JSON_RPC_URL || "http://localhost:8545";
   const provider = new ethers.providers.JsonRpcProvider(url);
   const signer = provider.getSigner();
 
-  const Proxy = new ethers.ContractFactory(abi, bytecode, signer);
+  const Proxy = ContractFactory.fromSolidity(ProxyArtifact, signer);
+  const Test = ContractFactory.fromSolidity(TestArtifact, signer);
 
   describe("code", () => {
     it("should deploy an instance of the proxy contract", async () => {
       const proxy = await Proxy.deploy(ethers.constants.AddressZero);
       expect(await provider.getCode(proxy.address)).to.equal(
-        `0x${deployedBytecode}`
+        `0x${ProxyArtifact.evm.deployedBytecode.object}`
       );
     });
 
@@ -30,8 +31,8 @@ describe("Proxy", () => {
   });
 
   describe("runtime", () => {
-    let proxy;
-    let test;
+    let proxy: Contract;
+    let test: Contract;
 
     beforeEach(async () => {
       test = await Test.connect(signer).deploy();
@@ -47,7 +48,7 @@ describe("Proxy", () => {
 
     it("should propagate reverts", async () => {
       const reason = "a really cool revert message";
-      const err = await proxy.revertWith(reason).catch((err) => err);
+      const err = await proxy.revertWith(reason).catch((err: Error) => err);
       expect(err).to.be.an.instanceof(Error);
       expect(err.message).to.contain(reason);
     });
@@ -59,7 +60,7 @@ describe("Proxy", () => {
     it("should ignore leading non-zero bytes in address", async () => {
       const BadProxy = new ethers.ContractFactory(
         ["constructor(bytes32)"],
-        bytecode,
+        ProxyArtifact.evm.bytecode.object,
         signer
       );
       const { address } = await BadProxy.deploy(
@@ -73,7 +74,7 @@ describe("Proxy", () => {
     it("should add a predictable amount of gas overhead", async () => {
       const PROXY_OVERHEAD = 51;
 
-      const gasOverhead = (inLength, outLength) => {
+      const gasOverhead = (inLength: number, outLength: number) => {
         const a = Math.ceil(Math.max(inLength, outLength) / 32);
         return BigNumber.from(
           700 /* delegatecall */ +
@@ -93,7 +94,7 @@ describe("Proxy", () => {
         const proxyGas = await proxy.estimateGas.resize(data, newLength);
         const directGas = await test.estimateGas.resize(data, newLength);
 
-        const roundToWord = (n) => Math.ceil(n / 32) * 32;
+        const roundToWord = (n: number) => Math.ceil(n / 32) * 32;
         const inLength =
           4 /* functionSelector */ +
           32 /* dataOffset */ +
