@@ -5,9 +5,13 @@
   "license": "LGPL-3.0+",
   "scripts": {
     "build": "ts-node ./compile/index.ts",
-    "fmt": "prettier -w '**/*.ts'",
+    "fmt": "prettier -w '**/*.ts' '*.json'",
     "test": "mocha -r ts-node/register 'test/**/*.test.ts'"
   },
+  "files": [
+    "build/Proxy.json",
+    "src/"
+  ],
   "devDependencies": {
     "@types/chai": "^4.2.15",
     "@types/mocha": "^8.2.0",
