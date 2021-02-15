@@ -27,20 +27,6 @@ describe("Proxy", () => {
         address.substr(2)
       );
     });
-
-    it("should store the implementation address in the EIP-1967 defined slot", async () => {
-      const address = ethers.utils.hexlify([...Array(20)].map(() => 0x42));
-      const proxy = await Proxy.deploy(address);
-
-      const EIP1967_SLOT = BigNumber.from(
-        ethers.utils.keccak256(
-          ethers.utils.toUtf8Bytes("eip1967.proxy.implementation")
-        )
-      ).sub(1);
-      expect(await provider.getStorageAt(proxy.address, EIP1967_SLOT)).to.equal(
-        address
-      );
-    });
   });
 
   describe("runtime", () => {

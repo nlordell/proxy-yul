@@ -6,18 +6,15 @@ object "Proxy" {
 
         let implementation := mload(datasize("runtime"))
         setimmutable(0, "implementation", implementation)
-        sstore(
-            0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc,
-            implementation
-        )
 
         return(0, datasize("runtime"))
     }
 
     object "runtime" {
         code {
-            // NOTE: Use `RETURNDATASIZE` instead of 0's as it is 1 gas cheaper
-            // and guaranteed to be 0 before the `DELEGATECALL`.
+            // NOTE: Use `RETURNDATASIZE` instead of 0's as it is 1 gas cheaper,
+            // generates smaller bytecode, and guaranteed to be 0 before the
+            // `DELEGATECALL`.
             calldatacopy(
                 returndatasize(),
                 returndatasize(),
