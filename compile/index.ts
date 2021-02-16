@@ -24,6 +24,15 @@ async function main() {
     },
     {
       language: "Solidity",
+      file: "src/ProxyFactory.sol",
+      outputSelection: [
+        "abi",
+        "evm.bytecode.object",
+        "evm.deployedBytecode.object",
+      ],
+    },
+    {
+      language: "Solidity",
       file: "test/contracts/Test.sol",
       outputSelection: ["abi", "evm.bytecode.object"],
     },

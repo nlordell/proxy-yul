@@ -47,7 +47,11 @@ export async function compile(
           },
         },
         settings: {
-          optimizer: { enabled: true },
+          optimizer: {
+            // NOTE: Don't enable the optimizer for Yul as generates worse code.
+            enabled: language === "Solidity",
+            runs: 1e6,
+          },
           outputSelection: {
             [file]: {
               [contractName]: outputSelection,

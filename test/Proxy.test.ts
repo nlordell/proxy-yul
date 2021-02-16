@@ -4,41 +4,71 @@ import { ethers, BigNumber, Contract, ContractFactory } from "ethers";
 import ProxyArtifact from "../build/Proxy.json";
 import TestArtifact from "../build/Test.json";
 
-describe("Proxy", () => {
-  const url = process.env.JSON_RPC_URL || "http://localhost:8545";
-  const provider = new ethers.providers.JsonRpcProvider(url);
-  const signer = provider.getSigner();
+import { slot, getProxyStorage } from "./eip1967";
+import { provider, signer } from "./provider";
 
-  const Proxy = ContractFactory.fromSolidity(ProxyArtifact, signer);
+describe("Proxy", () => {
+  const Proxy = ContractFactory.fromSolidity(ProxyArtifact);
   const Test = ContractFactory.fromSolidity(TestArtifact, signer);
 
   describe("code", () => {
     it("should deploy an instance of the proxy contract", async () => {
-      const proxy = await Proxy.deploy(ethers.constants.AddressZero);
+      const proxy = await Proxy.connect(signer).deploy(
+        ethers.constants.AddressZero
+      );
+
+      // NOTE: The first immutable that appears in the deployed bytecode is the
+      // proxy creator address, which is `signer.address` here. The other
+      // immutables are the EIP-1967 implementation slot.
+      const creator = await signer.getAddress();
+      const deployedBytecode = ProxyArtifact.evm.deployedBytecode.object
+        .replace(
+          `7f${"00".repeat(32)}`,
+          `7f${"00".repeat(12)}${creator.slice(2).toLowerCase()}`
+        )
+        .replace(
+          new RegExp(`7f${"00".repeat(32)}`, "g"),
+          `7f${slot("implementation").slice(2)}`
+        );
+
       expect(await provider.getCode(proxy.address)).to.equal(
-        `0x${ProxyArtifact.evm.deployedBytecode.object}`
+        `0x${deployedBytecode}`
       );
     });
 
-    it("should write the implementation address as an immutable", async () => {
-      const address = ethers.utils.hexlify([...Array(20)].map((_, i) => i));
-      const proxy = await Proxy.deploy(address);
+    it("should set the EIP-1967 implementation slot", async () => {
+      const implementation = ethers.utils.getAddress(`0x${"1337".repeat(10)}`);
+      const proxy = await Proxy.connect(signer).deploy(implementation);
 
-      expect(await provider.getCode(proxy.address)).to.contain(
-        address.substr(2)
+      expect(await getProxyStorage(proxy.address, "implementation")).to.equal(
+        implementation
       );
     });
   });
 
   describe("runtime", () => {
+    const creator = provider.getSigner(1);
+
     let proxy: Contract;
+    let proxyView: Contract;
     let test: Contract;
 
     beforeEach(async () => {
-      test = await Test.connect(signer).deploy();
-      const { address: proxyAddress } = await Proxy.deploy(test.address);
+      test = await Test.deploy();
+      const { address: proxyAddress } = await Proxy.connect(creator).deploy(
+        test.address
+      );
 
       proxy = test.attach(proxyAddress);
+      proxyView = new Contract(
+        proxyAddress,
+        [
+          "function implementation() view returns (address)",
+          "function beacon() view returns (address)",
+          "function admin() view returns (address)",
+        ],
+        creator
+      );
     });
 
     it("should proxy call to implementation", async () => {
@@ -61,7 +91,7 @@ describe("Proxy", () => {
       const BadProxy = new ethers.ContractFactory(
         ["constructor(bytes32)"],
         ProxyArtifact.evm.bytecode.object,
-        signer
+        creator
       );
       const { address } = await BadProxy.deploy(
         ethers.utils.hexConcat(["0x1badc0de2badc0de3badc0de", test.address])
@@ -72,12 +102,13 @@ describe("Proxy", () => {
     });
 
     it("should add a predictable amount of gas overhead", async () => {
-      const PROXY_OVERHEAD = 51;
+      const PROXY_OVERHEAD = 76;
 
       const gasOverhead = (inLength: number, outLength: number) => {
         const a = Math.ceil(Math.max(inLength, outLength) / 32);
         return BigNumber.from(
           700 /* delegatecall */ +
+            800 /* sload */ +
             (3 + 3 * Math.ceil(inLength / 32)) /* calldatacopy */ +
             (3 + 3 * Math.ceil(outLength / 32)) /* returndatacopy */ +
             (3 * a + Math.floor((a * a) / 512)) /* memory cost */ +
@@ -112,24 +143,30 @@ describe("Proxy", () => {
       }
     });
 
-    it("should add the minimal amount of runtime gas overhead", async () => {
-      const testAddress = test.address.replace(/^0x/, "").toLowerCase();
+    describe("view", () => {
+      it("should allow reading the implementation address", async () => {
+        expect(await proxyView.implementation()).to.equal(test.address);
+      });
 
-      // NOTE: Deployment code for the minimal proxy contract.
-      // <https://eips.ethereum.org/EIPS/eip-1167>
-      const MIN_PROXY_BYTECODE = `3d602d80600a3d3981f3363d3d373d3d3d363d73${testAddress}5af43d82803e903d91602b57fd5bf3`;
-      const MinProxy = new ContractFactory(
-        ProxyArtifact.abi,
-        MIN_PROXY_BYTECODE,
-        signer
-      );
-      const { address: proxyAddress } = await MinProxy.deploy(test.address);
-      const minProxy = test.attach(proxyAddress);
+      it("should allow reading the beacon address", async () => {
+        const beacon = ethers.utils.getAddress(`0x${"1337".repeat(10)}`);
+        await proxy.setBeacon(beacon);
 
-      const proxyGas = await proxy.estimateGas.echo("hello");
-      const minProxyGas = await minProxy.estimateGas.echo("hello");
+        expect(await getProxyStorage(proxy.address, "beacon")).to.equal(beacon);
+        expect(await proxyView.beacon()).to.equal(beacon);
+      });
 
-      expect(proxyGas).to.deep.equal(minProxyGas);
+      it("should allow reading the admin address", async () => {
+        const admin = ethers.utils.getAddress(`0x${"42".repeat(20)}`);
+        await proxy.setAdmin(admin);
+
+        expect(await getProxyStorage(proxy.address, "admin")).to.equal(admin);
+        expect(await proxyView.admin()).to.equal(admin);
+      });
+
+      it("ignore additional calldata bytes", async () => {});
+
+      it("revert for unexpected function selectors", async () => {});
     });
   });
 });
